@@ -1,24 +1,29 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_typeahead/flutter_typeahead.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:google_places_flutter/google_places_flutter.dart';
 import 'package:map_location_picker/map_location_picker.dart';
+import 'package:provider/provider.dart';
+
+import '../../constants/Constants.dart';
+import '../../providers/location_provider.dart';
 
 class LocationSearchDialog extends StatelessWidget {
-  final GoogleMapController? mapController;
-  const LocationSearchDialog({Key? key, required this.mapController}) : super(key: key);
+  const LocationSearchDialog({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    final TextEditingController controller = TextEditingController();
-    List<Prediction> _predictionList = [];
+    TextEditingController searchController = TextEditingController();
+    List<Prediction> _predictionList=[];
     return Container(
       margin: const EdgeInsets.only(top: 80),
       alignment: Alignment.topCenter,
       child: Material(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+
         child: SizedBox(width: 1170, child: TypeAheadField(
           textFieldConfiguration: TextFieldConfiguration(
-            controller: controller,
+            controller: searchController,
             textInputAction: TextInputAction.search,
             autofocus: true,
             textCapitalization: TextCapitalization.words,

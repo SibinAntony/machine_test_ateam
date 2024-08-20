@@ -14,7 +14,9 @@ import '../../constants/color.dart';
 import '../../constants/show_custom_snakbar.dart';
 import '../../models/VendorsModel.dart';
 import '../../resources/styles_manager.dart';
+import '../../widgets/animated_custom_dialog.dart';
 import '../location/LocationFetch.dart';
+import '../orders/MakeAnOrderDialog.dart';
 
 class VendorDetails extends StatefulWidget {
   VendorDetails({super.key, required this.vendorsModel});
@@ -337,10 +339,18 @@ class _VendorDetailsState extends State<VendorDetails> {
 
       print('checkdata $map');
 
-      Navigator.push(
+      showAnimatedDialog(
           context,
-          MaterialPageRoute(
-              builder: (_) => LocationFetch(placeOrder: true, map: map)));
+          MakeAnOrderDialog(
+            map: map,
+          ),
+          dismissible: true,
+          isFlip: false);
+
+      // Navigator.push(
+      //     context,
+      //     MaterialPageRoute(
+      //         builder: (_) => LocationFetch(placeOrder: true, map: map)));
     } else {
       showCustomSnackBar(
           "Please choose any method to make your order", context);

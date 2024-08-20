@@ -1,13 +1,25 @@
-import 'package:flutter/material.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:provider/provider.dart';
+import 'dart:convert';
 
-import 'location_provider.dart';
+import 'package:door_step_customer/constants/color.dart';
+import 'package:door_step_customer/constants/show_custom_snakbar.dart';
+import 'package:firebase_database/firebase_database.dart';
+import 'package:flutter/material.dart';
+import 'package:fluttertoast/fluttertoast.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:google_places_flutter/google_places_flutter.dart';
+import 'package:map_location_picker/map_location_picker.dart';
+import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import '../home/HomePage.dart';
+import '../../providers/location_provider.dart';
 import 'location_search_dialog.dart';
 
-class SelectLocationScreen extends StatefulWidget {
-  final GoogleMapController? googleMapController;
-  const SelectLocationScreen({Key? key, required this.googleMapController}) : super(key: key);
+class SelectLocationScreen extends StatefulWidget  {
+
+  bool isFromAuth=false;
+
+    SelectLocationScreen({Key? key, required this.isFromAuth}) : super(key: key);
 
   @override
   SelectLocationScreenState createState() => SelectLocationScreenState();
@@ -15,14 +27,31 @@ class SelectLocationScreen extends StatefulWidget {
 
 class SelectLocationScreenState extends State<SelectLocationScreen> {
   GoogleMapController? _controller;
-  final TextEditingController _locationController = TextEditingController();
+  // final TextEditingController _locationController = TextEditingController();
   CameraPosition? _cameraPosition;
+  TextEditingController searchController = TextEditingController();
+
+  final DatabaseReference submitData =
+  FirebaseDatabase.instance.reference().child('users');
 
   @override
   void initState() {
     super.initState();
+    // Provider.of<LocationProvider>(context).getCurrentLocation( false);
+    // Provider.of<LocationProvider>(context, listen: false).setPickData();
+    // _openSearchDialog(context,_controller);
+    //
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Provider.of<LocationProvider>(context).getCurrentLocation();
+      // showDialog(context: context, builder: (context) => const LocationSearchDialog());
+    });
+  }
 
-    Provider.of<LocationProvider>(context, listen: false).setPickData();
+  @override
+  void didChangeDependencies() {
+    // TODO: implement didChangeDependencies
+    super.didChangeDependencies();
+    // Provider.of<LocationProvider>(context).getCurrentLocation( false);
   }
 
   @override
@@ -32,12 +61,12 @@ class SelectLocationScreenState extends State<SelectLocationScreen> {
   }
 
   void _openSearchDialog(BuildContext context, GoogleMapController? mapController) async {
-    showDialog(context: context, builder: (context) => LocationSearchDialog(mapController: mapController));
+    showDialog(context: context, builder: (context) => const LocationSearchDialog());
   }
 
   @override
   Widget build(BuildContext context) {
-    _locationController.text = '${Provider.of<LocationProvider>(context).address.name ?? ''}, '
+    searchController.text = Provider.of<LocationProvider>(context).address.name==null ?'':'${Provider.of<LocationProvider>(context).address.name ?? ''}, '
         '${Provider.of<LocationProvider>(context).address.subAdministrativeArea ?? ''}, '
         '${Provider.of<LocationProvider>(context).address.isoCountryCode ?? ''}';
 
@@ -63,7 +92,7 @@ class SelectLocationScreenState extends State<SelectLocationScreen> {
                         indoorViewEnabled: true,
                         mapToolbarEnabled: true,
                         onCameraIdle: () {
-                          locationProvider.updatePosition(_cameraPosition, false, null, context);
+                          locationProvider.updatePosition(position: _cameraPosition, null, context);
                         },
                         onCameraMove: ((position) => _cameraPosition = position),
                         // markers: Set<Marker>.of(locationProvider.markers),
@@ -73,19 +102,57 @@ class SelectLocationScreenState extends State<SelectLocationScreen> {
                       ),
                       locationProvider.pickAddress != null
                           ? InkWell(
-                        onTap: () => _openSearchDialog(context, _controller),
                         child: Container(
                           width: MediaQuery.of(context).size.width,
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18.0),
+                          height: 60,
                           margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 23.0),
                           decoration:
                           BoxDecoration(color: Theme.of(context).cardColor, borderRadius: BorderRadius.circular(10)),
-                          child: Row(children: [
-                            Expanded(child: Text(locationProvider.pickAddress!.name != null
-                                ? '${locationProvider.pickAddress?.name ?? ''} ${locationProvider.pickAddress?.subAdministrativeArea ?? ''} ${locationProvider.pickAddress?.isoCountryCode ?? ''}'
-                                : '', maxLines: 1, overflow: TextOverflow.ellipsis)),
-                            const Icon(Icons.search, size: 20),
-                          ]),
+                         child: GooglePlaceAutoCompleteTextField(
+                            textEditingController: searchController,
+                            googleAPIKey: googleApiKey,
+                            inputDecoration: const InputDecoration(
+                              hintText: "Search your location",
+                              border: InputBorder.none,
+                              enabledBorder: InputBorder.none,
+                            ),
+                            countries: ["in"],
+                            getPlaceDetailWithLatLng: ( prediction) {
+
+
+                              double lat=double.parse(prediction.lat!);
+                              double lng=double.parse(prediction.lng!);
+
+                              locationProvider.setLocation(_controller,lat,lng);
+
+
+                            },
+                            itemClick: ( prediction) {
+                              searchController.text = prediction.description ?? "";
+                              searchController.selection = TextSelection.fromPosition(
+                                  TextPosition(offset: prediction.description?.length ?? 0));
+
+
+                            },
+                            seperatedBuilder: const Divider(),
+                            containerHorizontalPadding: 10,
+                            itemBuilder: (context, index,  prediction) {
+                              return Container(
+                                padding: const EdgeInsets.all(10),
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.location_on),
+                                    const SizedBox(
+                                      width: 7,
+                                    ),
+                                    Expanded(child: Text("${prediction.description ?? ""}"))
+                                  ],
+                                ),
+                              );
+                            },
+
+                            isCrossBtnShown: true,
+                          ),
                         ),
                       )
                           : const SizedBox.shrink(),
@@ -98,7 +165,9 @@ class SelectLocationScreenState extends State<SelectLocationScreen> {
                           children: [
                             InkWell(
                               onTap: () {
-                                locationProvider.getCurrentLocation(context, false, mapController: _controller);
+                                locationProvider.getCurrentLocation(  mapController: _controller);
+
+                                // locationProvider.setLocation(_controller,11.9415915,79.8083133);
                               },
                               child: Container(
                                 width: 50,
@@ -106,7 +175,7 @@ class SelectLocationScreenState extends State<SelectLocationScreen> {
                                 margin: const EdgeInsets.only(right: 20),
                                 decoration: BoxDecoration(
                                   borderRadius: BorderRadius.circular(10),
-                                  color: Colors.black,
+                                  color: Colors.transparent,
                                 ),
                                 child: Icon(
                                   Icons.my_location,
@@ -115,18 +184,32 @@ class SelectLocationScreenState extends State<SelectLocationScreen> {
                                 ),
                               ),
                             ),
-                            SizedBox(
-                              width: double.infinity,
-                              child: Padding(
-                                padding: const EdgeInsets.all(20),
-                                child: Container(child: InkWell( child: Text('Select Location'),)),
-                                // child: CustomButton(
-                                //   buttonText: getTranslated('select_location', context),
-                                //   onTap: () {
-                                //
-                                //   },
-                                // ),
-                              ),
+
+                            Column(
+                              children: [
+                                Container(
+                                  height: 55,
+                                  width: MediaQuery.of(context).size.width,
+                                  margin: const EdgeInsets.only(
+                                      top: 20, left: 30, right: 30, bottom: 30),
+                                  child: TextButton(
+                                      style: ButtonStyle(
+                                          foregroundColor:
+                                          MaterialStateProperty.all<Color>(Colors.white),
+                                          backgroundColor:
+                                          MaterialStateProperty.all<Color>(primaryColor),
+                                          shape: MaterialStateProperty.all<
+                                              RoundedRectangleBorder>(const RoundedRectangleBorder(
+                                            borderRadius:
+                                            BorderRadius.all(Radius.circular(15)),
+                                          ))),
+                                      onPressed: () async => {
+                                        saveLocation()
+                                      },
+                                      child: const Text("Use this Location",
+                                          style: TextStyle(fontSize: 14))),
+                                ),
+                              ],
                             ),
                           ],
                         ),
@@ -149,5 +232,48 @@ class SelectLocationScreenState extends State<SelectLocationScreen> {
         ),
       ),
     );
+  }
+  late SharedPreferences sharedPref;
+  saveLocation() async {
+
+    sharedPref = await SharedPreferences.getInstance();
+    String? userPref = sharedPref.getString('userData');
+    Map<String, dynamic> userMap =
+    jsonDecode(userPref!) as Map<String, dynamic>;
+
+    Map<String, dynamic> newData = {
+      'currentFullAddress':  searchController.text,
+      'currentLatitude':Provider.of<LocationProvider>(context, listen: false).lat,
+      'currentLongitude':  Provider.of<LocationProvider>(context, listen: false).lng,
+      'currentArea':  Provider.of<LocationProvider>(context, listen: false).address.locality.toString(),
+    };
+    submitData.child(userMap['key']!).update(newData).then((value) {
+      success(newData);
+
+    }).catchError((error) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Something failed :$error'),
+        duration: const Duration(seconds: 2),
+      ));
+    });
+
+  }
+
+  Future<void> success(Map<String, dynamic> user) async {
+    SharedPreferences sharedPref = await SharedPreferences.getInstance();
+    sharedPref.setString("userLocation", jsonEncode(user));
+
+    Navigator.of(context).pushReplacement(MaterialPageRoute(
+        builder: (BuildContext context) => const MyHomePage()));
+
+    showCustomSnackBar('Address Updated', context,isError: false);
+
+    // if(widget.isFromAuth){
+    //
+    // }else {
+    //
+    //   Navigator.pop(context);
+    // }
+
   }
 }

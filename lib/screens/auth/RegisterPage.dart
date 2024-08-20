@@ -11,6 +11,7 @@ import '../../constants/Images.dart';
 import '../../constants/color.dart';
 import '../../constants/show_custom_snakbar.dart';
 import '../home/HomePage.dart';
+import '../location/select_location_screen.dart';
 
 class RegisterPage extends StatefulWidget {
   RegisterPage({super.key, required this.mobileNumber});
@@ -222,12 +223,13 @@ class _RegisterPageState extends State<RegisterPage> {
       'userName': controllerName.text,
       'mobileNumber': controllerMobile.text,
       'userEmail': controllerEmail.text,
+      'userType': '2',
       'isActive': true,
     };
     submitData.child(newKey!).set(newData).then((value) {
       success(newData);
 
-      showCustomSnackBar("User Created Successfully", context, isError: false);
+      showCustomSnackBar("User Created Successfully", context, isError: false,isToaster: false);
     }).catchError((error) {
       showCustomSnackBar("${error.toString()}", context, isError: true);
     });
@@ -240,13 +242,17 @@ class _RegisterPageState extends State<RegisterPage> {
     sharedPref.setString("userData", jsonEncode(user));
     sharedPref.setBool('isLoggedIn', true);
 
-    print('haii user ${user.toString()}');
 
     setState(() {
       isLoading = false;
     });
 
-    Navigator.of(context).pushReplacement(MaterialPageRoute(
-        builder: (BuildContext context) => const MyHomePage()));
+    Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+            builder: (_) =>  SelectLocationScreen(
+              isFromAuth: true,
+            )));
+
   }
 }

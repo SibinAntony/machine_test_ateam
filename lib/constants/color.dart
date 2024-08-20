@@ -52,7 +52,9 @@ double latitudeCurrent = 10.2771958;
 double longitudeCurrent = 78.5365558;
 String fullAddress = 'Ponamaravathi';
 String pincode = '600 001';
+// String googleApiKey = 'AIzaSyApjU9e6B4XB5Z_rXTar29xexmPij43RMw';
 String googleApiKey = 'AIzaSyApjU9e6B4XB5Z_rXTar29xexmPij43RMw';
+
 
 String orderTypeRes = '1';
 String orderTypePickUp = '2';

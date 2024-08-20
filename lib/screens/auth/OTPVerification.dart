@@ -14,6 +14,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../constants/show_custom_snakbar.dart';
 import '../../models/UserModel.dart';
 import '../../resources/styles_manager.dart';
+import '../location/select_location_screen.dart';
 import 'RegisterPage.dart';
 
 class OTPVerification extends StatefulWidget {
@@ -31,7 +32,7 @@ class _OTPVerificationState extends State<OTPVerification> {
   late SharedPreferences sharedPref;
 
   TextEditingController controller = TextEditingController();
-  int secondsRemaining = 10;
+  int secondsRemaining = 30;
   bool enableResend = false;
   late Timer timer;
 
@@ -189,6 +190,8 @@ class _OTPVerificationState extends State<OTPVerification> {
       // Sign the user in (or link) with the credential
       await FirebaseAuth.instance.signInWithCredential(credential);
 
+
+
       checkExistingUer(widget.mobileNumber);
     } on FirebaseAuthException catch (e) {
       showCustomSnackBar("Invalid OTP", context);
@@ -249,7 +252,12 @@ class _OTPVerificationState extends State<OTPVerification> {
 
     print('haii user ${user.toString()}');
 
-    Navigator.of(context).pushReplacement(MaterialPageRoute(
-        builder: (BuildContext context) => const MyHomePage()));
+    Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+            builder: (_) =>  SelectLocationScreen(
+              isFromAuth: true,
+            )));
+
   }
 }

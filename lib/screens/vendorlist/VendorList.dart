@@ -1,13 +1,14 @@
+import 'dart:convert';
 import 'dart:math';
 
 import 'package:door_step_customer/constants/color.dart';
 import 'package:door_step_customer/resources/styles_manager.dart';
 import 'package:door_step_customer/screens/vendorDetails/VendorDetails.dart';
 import 'package:firebase_database/firebase_database.dart';
-import 'package:firebase_pagination/firebase_pagination.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../models/CategoryModel.dart';
 import '../../models/VendorsModel.dart';
@@ -25,7 +26,7 @@ class VendorListPage extends StatefulWidget {
   State<VendorListPage> createState() => _VendorListPageState();
 }
 
-class _VendorListPageState extends State<VendorListPage> {
+class _VendorListPageState extends State<VendorListPage> with WidgetsBindingObserver  {
   late final stream = FirebaseDatabase.instance.ref('category').onValue;
   late var streamVendors = FirebaseDatabase.instance
       .ref('vendors')
@@ -39,12 +40,24 @@ class _VendorListPageState extends State<VendorListPage> {
 
   @override
   void initState() {
-
     super.initState();
-
-    print('widget.categoryModel.toString()');
-    print(widget.categoryModel.toString());
+    WidgetsBinding.instance.addObserver(this);
+    fetchUserData();
   }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeDependencies() {
+    // TODO: implement didChangeDependencies
+    super.didChangeDependencies();
+    fetchUserData();
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -206,7 +219,24 @@ class _VendorListPageState extends State<VendorListPage> {
               ),
             ],
           );
-        }));
+        })
+    );
+
+
+  }
+
+  late SharedPreferences sharedPreferences;
+  late double latitudeCurrent = 0.0;
+  late double longitudeCurrent = 0.0;
+  Future<void> fetchUserData() async {
+    sharedPreferences = await SharedPreferences.getInstance();
+    String? userPref = sharedPreferences.getString('userData');
+    String? userLocationPref = sharedPreferences.getString('userLocation');
+
+    Map<String, dynamic> userMap = jsonDecode(userPref!) as Map<String, dynamic>;
+    Map<String, dynamic> userLocationMap = jsonDecode(userLocationPref!) as Map<String, dynamic>;
+    latitudeCurrent =userLocationMap['currentLatitude'] ;
+    longitudeCurrent = userLocationMap['currentLongitude'];
   }
 
   double _calculateDistance(
@@ -233,7 +263,7 @@ class SubSubCategoryItem extends StatelessWidget {
 
   final bool isSelected;
 
-  const SubSubCategoryItem(
+   SubSubCategoryItem(
       {Key? key, required this.title, required this.isSelected})
       : super(key: key);
 
@@ -269,4 +299,6 @@ class SubSubCategoryItem extends StatelessWidget {
       ),
     );
   }
+
+
 }

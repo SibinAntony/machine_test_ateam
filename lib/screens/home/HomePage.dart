@@ -17,23 +17,25 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../constants/Images.dart';
 import '../../constants/color.dart';
 import '../../models/CategoryModel.dart';
+import '../../providers/HomeProviders.dart';
 import '../../resources/styles_manager.dart';
 import '../location/select_location_screen.dart';
 import '../vendorDetails/VendorDetails.dart';
 
-class MyHomePage extends StatefulWidget {
+class MyHomePage extends StatefulWidget  {
   const MyHomePage({super.key});
 
   @override
   State<MyHomePage> createState() => _MyHomePageState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
+class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver  {
   int maxDistanceInKm = 10;
   late SharedPreferences sharedPreferences;
   String? userPref;
@@ -55,13 +57,17 @@ class _MyHomePageState extends State<MyHomePage> {
   late String userName = "";
   late String customerId = "";
   late String mobileNumber = "";
-
-  GoogleMapController? _controllerMap;
+  late String userLocation = "";
+  late double latitudeCurrent = 0.0;
+  late double longitudeCurrent = 0.0;
+  // late bool notProvidingService = false;
 
   int _current = 0;
   final CarouselController _controller = CarouselController();
 
   Position? _currentPosition;
+
+
 
   Future<void> _getCurrentPosition() async {
     final hasPermission = await _handleLocationPermission();
@@ -129,8 +135,39 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    fetchUserData();
+    _getCurrentPosition();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeDependencies() {
+    // TODO: implement didChangeDependencies
+    super.didChangeDependencies();
     fetchUserData();
   }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    print('state -> ${state.name}');
+
+    if (state == AppLifecycleState.resumed) {
+      // The app has resumed from the background
+      print('App resumed');
+      fetchUserData();
+      // Add your onResume code here
+    }else if(state==AppLifecycleState.paused){
+      print('App paused');
+    }
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -154,7 +191,10 @@ class _MyHomePageState extends State<MyHomePage> {
         ),
         child: CustomScrollView(
           slivers: [
-            SliverToBoxAdapter(
+
+    Consumer<HomeProviders>(builder: (context, provider, child) {
+           return provider.notProvidingService ?
+           SliverToBoxAdapter(
               child: Column(
                 children: [
                   Container(
@@ -176,8 +216,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                       Navigator.push(
                                           context,
                                           MaterialPageRoute(
-                                              builder: (_) => SelectLocationScreen(
-                                                googleMapController: _controllerMap,
+                                              builder: (_) =>  SelectLocationScreen(isFromAuth: false,
                                                   )));
                                     },
                                     child: Container(
@@ -185,7 +224,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                           const EdgeInsets.only(right: 10),
                                       alignment: Alignment.centerLeft,
                                       child: Text(
-                                        'Ponamaravthi',
+                                        userLocation,
                                         textAlign: TextAlign.center,
                                         style: getHeadingStyle2(
                                                 color: Colors.black)
@@ -201,7 +240,6 @@ class _MyHomePageState extends State<MyHomePage> {
                               ),
                               InkWell(
                                 onTap: () {
-                                  print('haii ${customerId}');
                                   Navigator.of(context).push(
                                       MaterialPageRoute(
                                           builder: (BuildContext context) =>
@@ -728,6 +766,9 @@ class _MyHomePageState extends State<MyHomePage> {
                                   vendorList.sort((a, b) =>
                                       a.distance.compareTo(b.distance));
                                   vendorList = vendorList.take(6).toList();
+
+                                  // Provider.of<HomeProviders>(context).setNotProvidingService(vendorList.isEmpty);
+
                                   return vendorList.isNotEmpty
                                       ? GridView.builder(
                                           padding: EdgeInsets.zero,
@@ -770,41 +811,6 @@ class _MyHomePageState extends State<MyHomePage> {
                               },
                             )),
 
-                        // Container(
-                        //   margin: EdgeInsets.only(top: 30),
-                        //   // height: 500,
-                        //   child: RealtimeDBPagination(
-                        //     query: FirebaseDatabase.instance.ref().child('vendors').orderByChild('ascending'),
-                        //     orderBy: 'score',
-                        //     viewType: ViewType.grid,
-                        //     itemBuilder: (context, dataSnapshot, index) {
-                        //
-                        //       final data = dataSnapshot.value as Map<dynamic, dynamic>;
-                        //
-                        //       // Map<dynamic, dynamic> data1=dataSnapshot.value as Map;
-                        //
-                        //       print('haii ${data.toString()}');
-                        //
-                        //       VendorsModel vendorModel=VendorsModel(
-                        //           dataSnapshot.key!,
-                        //           data['vendorName'],
-                        //           data['vendorImage'],
-                        //           data['vendorLatitude'],
-                        //           data['vendorLongitude'],
-                        //           data['categoryKey'],
-                        //           data['categoryName']);
-                        //
-                        //       return VendorItem(info: vendorModel,);
-                        //
-                        //       // Do something cool with the data
-                        //     },
-                        //     gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                        //       crossAxisCount: 2,
-                        //       mainAxisSpacing: 15.0,
-                        //       crossAxisSpacing: 15.0,
-                        //     ),
-                        //   ),
-                        // ),
                       ],
                     ),
                   ),
@@ -817,7 +823,179 @@ class _MyHomePageState extends State<MyHomePage> {
                   )
                 ],
               ),
-            ),
+            ):
+            SliverToBoxAdapter(
+              child: Column(
+                children: [
+                  Container(
+                    padding:
+                    const EdgeInsets.only(top: 50, left: 15, right: 15),
+                    child: Column(
+                      children: [
+                        Container(
+                          margin: const EdgeInsets.only(top: 20),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.max,
+                            mainAxisAlignment:
+                            MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                children: [
+                                  InkWell(
+                                    onTap: () {
+                                      Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                              builder: (_) =>  SelectLocationScreen(isFromAuth: false,
+                                              )));
+                                    },
+                                    child: Container(
+                                      margin:
+                                      const EdgeInsets.only(right: 10),
+                                      alignment: Alignment.centerLeft,
+                                      child: Text(
+                                        userLocation,
+                                        textAlign: TextAlign.center,
+                                        style: getHeadingStyle2(
+                                            color: Colors.black)
+                                            .copyWith(
+                                            fontSize: 12,
+                                            fontWeight:
+                                            FontWeight.w600),
+                                      ),
+                                    ),
+                                  ),
+                                  const Icon(Icons.location_on_rounded,size: 15,),
+                                ],
+                              ),
+                              InkWell(
+                                onTap: () {
+                                  Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                          builder: (BuildContext context) =>
+                                              OrderListScreen(
+                                                userPref: mobileNumber,
+                                              )));
+                                },
+                                child: Stack(
+                                  children: [
+                                    Container(
+                                      height: 35,
+                                      width: 35,
+                                      margin:
+                                      const EdgeInsets.only(right: 15),
+                                      decoration: BoxDecoration(
+                                        color: Colors.black87,
+                                        borderRadius:
+                                        BorderRadius.circular(20),
+                                        // borderRadius: BorderRadius.all(Radius.circular(10))
+                                      ),
+                                      child: const Icon(
+                                        Icons.person,
+                                        color: Colors.white,
+                                        size: 18,
+                                      ),
+                                    ),
+                                    Visibility(
+                                      visible: false,
+                                      child: Positioned(
+                                          right: 15,
+                                          top: 1,
+                                          child: Container(
+                                            width: 8,
+                                            height: 8,
+                                            decoration: BoxDecoration(
+                                              color: Colors.orange,
+                                              borderRadius:
+                                              BorderRadius.circular(4),
+                                            ),
+                                          )),
+                                    )
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.only(
+                              top: 0, left: 0, right: 10, bottom: 0),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.max,
+                            mainAxisAlignment:
+                            MainAxisAlignment.spaceBetween,
+                            children: [
+                              Container(
+                                width:
+                                MediaQuery.of(context).size.width / 2,
+
+                                child: Image.asset(
+                                  Images.top_images1,
+                                  fit: BoxFit.contain,
+                                ),
+                              ),
+                              Column(
+                                crossAxisAlignment:
+                                CrossAxisAlignment.center,
+                                children: [
+                                  Container(
+                                    alignment: Alignment.centerLeft,
+                                    margin: const EdgeInsets.only(top: 0),
+                                    child: Text(
+                                      'Welcome back,',
+                                      textAlign: TextAlign.center,
+                                      style: getHeadingStyle2(
+                                          color: Colors.black)
+                                          .copyWith(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.w300),
+                                    ),
+                                  ),
+                                  Container(
+                                    alignment: Alignment.center,
+                                    margin: const EdgeInsets.only(top: 10),
+                                    child: Text(
+                                      '$userName',
+                                      textAlign: TextAlign.center,
+                                      style: getHeadingStyle2(
+                                          color: Colors.black)
+                                          .copyWith(
+                                          fontSize: 23,
+                                          fontWeight: FontWeight.w300),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        Container(
+                          alignment: Alignment.center,
+                          margin: const EdgeInsets.only(top: 50),
+                          child: Text(
+                            'Currently we are not providing our Service in your Location!!! \n\n Soon We will meet again',
+                            textAlign: TextAlign.center,
+                            style: getHeadingStyle2(
+                                color: Colors.black)
+                                .copyWith(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w300),
+                          ),
+                        ),
+
+                      ],
+                    ),
+                  ),
+                  Container(
+                    margin: const EdgeInsets.only(top: 100),
+                    child: Image.asset(
+                      Images.happy_shopping,
+                      fit: BoxFit.cover,
+                    ),
+                  )
+                ],
+              ),);})
           ],
         ),
       ),
@@ -827,15 +1005,17 @@ class _MyHomePageState extends State<MyHomePage> {
   Future<void> fetchUserData() async {
     sharedPreferences = await SharedPreferences.getInstance();
     String? userPref = sharedPreferences.getString('userData');
+    String? userLocationPref = sharedPreferences.getString('userLocation');
 
-    Map<String, dynamic> userMap =
-        jsonDecode(userPref!) as Map<String, dynamic>;
-    String name = userMap['userName'];
+    Map<String, dynamic> userMap = jsonDecode(userPref!) as Map<String, dynamic>;
+    Map<String, dynamic> userLocationMap = jsonDecode(userLocationPref!) as Map<String, dynamic>;
+    String name = userMap['userName']??'';
     customerId = userMap['key'] ?? '';
     mobileNumber = userMap['mobileNumber'] ?? '';
-    // userName = name.split(' ') as String?;
+    userLocation = userLocationMap['currentArea'] ?? 'Select Area';
+    latitudeCurrent =userLocationMap['currentLatitude'] ;
+    longitudeCurrent = userLocationMap['currentLongitude'];
     List<String> parts = name.split(" ");
     userName = parts[0];
-    print("First Name: $userName");
   }
 }

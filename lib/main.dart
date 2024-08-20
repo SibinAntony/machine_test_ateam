@@ -1,6 +1,7 @@
 import 'package:door_step_customer/constants/color.dart';
+import 'package:door_step_customer/providers/HomeProviders.dart';
 import 'package:door_step_customer/providers/VendorProviders.dart';
-import 'package:door_step_customer/screens/location/location_provider.dart';
+import 'package:door_step_customer/providers/location_provider.dart';
 import 'package:door_step_customer/screens/splash/SplashScreen.dart';
 import 'package:firebase_core/firebase_core.dart';
 
@@ -27,6 +28,7 @@ Future<void> main() async {
     providers: [
       ChangeNotifierProvider.value(value: VendorProviders()),
       ChangeNotifierProvider.value(value: LocationProvider()),
+      ChangeNotifierProvider.value(value: HomeProviders()),
     ],
     child: MyApp(),
   ));
