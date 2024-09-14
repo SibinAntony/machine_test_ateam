@@ -61,6 +61,9 @@ dependencies:
   map_location_picker: ^1.2.7
   flutter_typeahead: ^4.0.0
   google_places_flutter: ^2.0.9
+  googleapis: ^13.1.0
+  googleapis_auth: ^1.6.0
+  firebase_messaging: ^14.9.4
 #  google_places_flutter: ^0.3.0
 
 #  search_map_location: 0.0.6

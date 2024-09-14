@@ -21,4 +21,15 @@ class MapUtils {
       throw 'Could not launch $call';
     }
   }
+
+  static Future<void> makeEmail(String email) async {
+    final call = Uri.parse("mailto:$email");
+    await launchUrl(call);
+
+    // if (await canLaunchUrl(call)) {
+    //   launchUrl(call);
+    // } else {
+    //   throw 'Could not launch $call';
+    // }
+  }
 }

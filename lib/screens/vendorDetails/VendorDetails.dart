@@ -10,12 +10,14 @@ import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../constants/MapUtils.dart';
 import '../../constants/color.dart';
 import '../../constants/show_custom_snakbar.dart';
 import '../../models/VendorsModel.dart';
 import '../../resources/styles_manager.dart';
 import '../../widgets/animated_custom_dialog.dart';
 import '../location/LocationFetch.dart';
+import '../location/select_location_screen.dart';
 import '../orders/MakeAnOrderDialog.dart';
 
 class VendorDetails extends StatefulWidget {
@@ -45,8 +47,27 @@ class _VendorDetailsState extends State<VendorDetails> {
     vendorsModel = widget.vendorsModel;
   }
 
+
+
   // pick image
-  Future selectImage() async {
+  Future selectCamera() async {
+    final pickedFile = await picker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 50,
+        maxHeight: 500,
+        maxWidth: 500);
+    setState(() {
+      if (pickedFile != null) {
+        file = File(pickedFile.path);
+        isImgSelected = true;
+      } else {
+        if (kDebugMode) {
+          print('No image selected.');
+        }
+      }
+    });
+  }
+ Future selectGallery() async {
     final pickedFile = await picker.pickImage(
         source: ImageSource.gallery,
         imageQuality: 50,
@@ -208,22 +229,26 @@ class _VendorDetailsState extends State<VendorDetails> {
               style: getMediumStyle(color: Colors.black)
                   .copyWith(fontWeight: FontWeight.w600, fontSize: 14),
             ),
-            Container(
-              margin: const EdgeInsets.only(
-                  top: 30, left: 30, right: 30, bottom: 0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                      margin: const EdgeInsets.only(left: 10, right: 10),
-                      child: const Icon(Icons.call)),
-                  Text(
-                    'Call us Directly',
-                    // overflow: TextOverflow.ellipsis,
-                    style: getHeadingStyle(color: Colors.black)
-                        .copyWith(fontWeight: FontWeight.w600, fontSize: 20),
-                  ),
-                ],
+            InkWell(onTap: (){
+              MapUtils.makeCall('+${vendorsModel.mobileNumber}');
+            },
+              child: Container(
+                margin: const EdgeInsets.only(
+                    top: 30, left: 30, right: 30, bottom: 0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                        margin: const EdgeInsets.only(left: 10, right: 10),
+                        child: const Icon(Icons.call)),
+                    Text(
+                      'Call us Directly',
+                      // overflow: TextOverflow.ellipsis,
+                      style: getHeadingStyle(color: Colors.black)
+                          .copyWith(fontWeight: FontWeight.w600, fontSize: 20),
+                    ),
+                  ],
+                ),
               ),
             ),
             Container(
@@ -309,9 +334,9 @@ class _VendorDetailsState extends State<VendorDetails> {
     if (controllerItemsList.text.isNotEmpty || isImgSelected || isCallChecked) {
       // showCustomSnackBar("Make an order", context);
 
-      SharedPreferences sharedPreferences =
-          await SharedPreferences.getInstance();
+      SharedPreferences sharedPreferences = await SharedPreferences.getInstance();
       String? userPref = sharedPreferences.getString('userData');
+      String? deviceToken = sharedPreferences.getString('deviceToken');
 
       Map<String, dynamic> userMap =
           jsonDecode(userPref!) as Map<String, dynamic>;
@@ -335,17 +360,23 @@ class _VendorDetailsState extends State<VendorDetails> {
         'itemsListImage': file,
         'isByCall': isCallChecked,
         'isImgSelected': isImgSelected,
+        'customerDeviceToken': deviceToken
       };
 
       print('checkdata $map');
 
-      showAnimatedDialog(
-          context,
-          MakeAnOrderDialog(
-            map: map,
-          ),
-          dismissible: true,
-          isFlip: false);
+
+      Navigator.of(context).push(MaterialPageRoute(
+          builder: (BuildContext context) =>  SelectLocationScreen(isDeliveryAddress: true,map: map,isFromAuthDeliveryAddress: false)));
+
+
+      // showAnimatedDialog(
+      //     context,
+      //     MakeAnOrderDialog(
+      //       map: map,
+      //     ),
+      //     dismissible: true,
+      //     isFlip: false);
 
       // Navigator.push(
       //     context,
@@ -355,5 +386,32 @@ class _VendorDetailsState extends State<VendorDetails> {
       showCustomSnackBar(
           "Please choose any method to make your order", context);
     }
+  }
+
+  void selectImage() {
+    showDialog(
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+            title:  Text("Choose below option to upload image",style: getMediumStyle(color: Colors.black)
+                .copyWith(fontWeight: FontWeight.w400, fontSize: 16),),
+            actions: [
+              TextButton(
+                  onPressed: () {
+                    Navigator.pop(context);  //Close your current dialog
+                    selectGallery();
+                  },
+                  child:  Text("Gallery",  style: getMediumStyle(color: Colors.black)
+                      .copyWith(fontWeight: FontWeight.w400, fontSize: 13),)),
+              TextButton(
+                  onPressed: () {
+                    Navigator.pop(context);  //Close your current dialog
+                    selectCamera();
+                  },
+                  child: Text("Camera",  style: getMediumStyle(color: Colors.black)
+              .copyWith(fontWeight: FontWeight.w400, fontSize: 13),)),
+            ],
+          );
+        });
   }
 }

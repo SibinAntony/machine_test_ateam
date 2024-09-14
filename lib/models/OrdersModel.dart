@@ -26,6 +26,10 @@ class OrdersModel {
   String deliveryManMobileNumber;
   String deliveryManName;
   String deliveryManNotes;
+  String deliveryCharge;
+  String totalAmount;
+  String billURL;
+  String paymentType;
 
 
   OrdersModel(
@@ -56,5 +60,15 @@ class OrdersModel {
       this.deliveryManName,
       this.deliveryManMobileNumber,
       this.deliveryManNotes,
+      this.deliveryCharge,
+      this.totalAmount,
+      this.billURL,
+      this.paymentType,
+
       );
+
+  @override
+  String toString() {
+    return 'OrdersModel{key: $key, customerId: $customerId, customerName: $customerName, customerMobile: $customerMobile, customerEmail: $customerEmail, categoryId: $categoryId, categoryName: $categoryName, vendorId: $vendorId, vendorName: $vendorName, vendorLatitude: $vendorLatitude, vendorLongitude: $vendorLongitude, itemsListStr: $itemsListStr, itemsListImageURL: $itemsListImageURL, isByCall: $isByCall, isImgSelected: $isImgSelected, customerDeliveryLatitude: $customerDeliveryLatitude, customerDeliveryLongitude: $customerDeliveryLongitude, customerDeliveryFullAddress: $customerDeliveryFullAddress, customerDeliveryPinCode: $customerDeliveryPinCode, orderType: $orderType, orderID: $orderID, orderCreatedDate: $orderCreatedDate, orderStatus: $orderStatus, deliveryManId: $deliveryManId, deliveryManMobileNumber: $deliveryManMobileNumber, deliveryManName: $deliveryManName, deliveryManNotes: $deliveryManNotes}';
+  }
 }

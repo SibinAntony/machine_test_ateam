@@ -6,6 +6,7 @@ import 'package:door_step_customer/screens/home/HomePage.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:pinput/pinput.dart';
@@ -30,7 +31,7 @@ class OTPVerification extends StatefulWidget {
 
 class _OTPVerificationState extends State<OTPVerification> {
   late SharedPreferences sharedPref;
-
+  bool isLoading = false;
   TextEditingController controller = TextEditingController();
   int secondsRemaining = 30;
   bool enableResend = false;
@@ -39,6 +40,7 @@ class _OTPVerificationState extends State<OTPVerification> {
   @override
   initState() {
     super.initState();
+    isLoading = false;
     controller.text = '';
     timer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (secondsRemaining != 0) {
@@ -113,25 +115,42 @@ class _OTPVerificationState extends State<OTPVerification> {
             ),
           ),
         ),
-        Container(
-          height: 55,
-          width: MediaQuery.of(context).size.width,
-          margin:
-              const EdgeInsets.only(top: 30, left: 30, right: 30, bottom: 30),
-          child: TextButton(
-              child: Text("Verify OTP".toUpperCase(),
-                  style: TextStyle(fontSize: 14)),
-              style: ButtonStyle(
-                  foregroundColor:
-                      MaterialStateProperty.all<Color>(Colors.white),
-                  backgroundColor:
-                      MaterialStateProperty.all<Color>(primaryColor),
-                  shape: MaterialStateProperty.all<RoundedRectangleBorder>(
-                      RoundedRectangleBorder(
-                    borderRadius: BorderRadius.all(Radius.circular(15)),
-                  ))),
-              onPressed: () async => {validate()}),
-        )
+        Stack(
+          children: [
+            Visibility(
+                visible: !isLoading,
+                child: Container(
+                  height: 55,
+                  width: MediaQuery.of(context).size.width,
+                  margin: const EdgeInsets.only(
+                      top: 30, left: 30, right: 30, bottom: 30),
+                  child: TextButton(
+                      child: Text("Verify OTP".toUpperCase(),
+                          style: TextStyle(fontSize: 14)),
+                      style: ButtonStyle(
+                          foregroundColor:
+                              MaterialStateProperty.all<Color>(Colors.white),
+                          backgroundColor:
+                              MaterialStateProperty.all<Color>(primaryColor),
+                          shape:
+                              MaterialStateProperty.all<RoundedRectangleBorder>(
+                                  RoundedRectangleBorder(
+                            borderRadius: BorderRadius.all(Radius.circular(15)),
+                          ))),
+                      onPressed: () async => {validate()}),
+                )),
+            Visibility(
+              visible: isLoading,
+              child: Container(
+                  alignment: Alignment.center,
+                  margin: const EdgeInsets.only(
+                      top: 20, left: 30, right: 30, bottom: 30),
+                  child: const CircularProgressIndicator(
+                    color: primaryColor,
+                  )),
+            )
+          ],
+        ),
       ],
     );
   }
@@ -190,11 +209,15 @@ class _OTPVerificationState extends State<OTPVerification> {
       // Sign the user in (or link) with the credential
       await FirebaseAuth.instance.signInWithCredential(credential);
 
-
-
       checkExistingUer(widget.mobileNumber);
     } on FirebaseAuthException catch (e) {
-      showCustomSnackBar("Invalid OTP", context);
+      setState(() {
+        isLoading = false;
+      });
+      if(kDebugMode) {
+        print("Failure status ${e.message}");
+      }
+      showCustomSnackBar("Invalid OTP", context,isToaster: true,isError: true);
     }
   }
 
@@ -208,6 +231,10 @@ class _OTPVerificationState extends State<OTPVerification> {
       return;
     }
 
+    setState(() {
+      isLoading = true;
+    });
+
     verifyOTP(context, widget.verificationID, controller.text);
   }
 
@@ -218,6 +245,9 @@ class _OTPVerificationState extends State<OTPVerification> {
         .equalTo(phoneNumber)
         .once()
         .then((value) async => {
+              setState(() {
+                isLoading = false;
+              }),
               if (value.snapshot.value == null)
                 {
                   Navigator.of(context).pushReplacement(MaterialPageRoute(
@@ -255,9 +285,8 @@ class _OTPVerificationState extends State<OTPVerification> {
     Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-            builder: (_) =>  SelectLocationScreen(
-              isFromAuth: true,
-            )));
-
+            builder: (_) => SelectLocationScreen(
+              isDeliveryAddress: false,isFromAuthDeliveryAddress: true
+                )));
   }
 }

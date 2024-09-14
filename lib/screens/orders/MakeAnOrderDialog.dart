@@ -1,14 +1,19 @@
 // import 'dart:io';
 
+import 'dart:convert';
 import 'dart:io';
 
+import 'package:door_step_customer/constants/show_custom_snakbar.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 
 import '../../constants/color.dart';
+import '../../providers/location_provider.dart';
 import '../../resources/styles_manager.dart';
 import 'OrderSuccessScreen.dart';
 
@@ -26,33 +31,71 @@ class _MakeAnOrderDialogState extends State<MakeAnOrderDialog> {
       FirebaseDatabase.instance.reference().child('orders');
 
   late Map map;
+late     double finalPrice;
+
+
+  @override
+  void initState() {
+    // TODO: implement initState
+    super.initState();
+
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+
+    });
+
+  }
 
   @override
   Widget build(BuildContext context) {
     map = widget.map!;
+    double startLat = widget.map!["vendorLatitude"]; // Example starting point (San Francisco)
+    double startLng = widget.map!["vendorLongitude"];
+    double endLat = widget.map!["customerDeliveryLatitude"];   // Example destination (Los Angeles)
+    double endLng = widget.map!["customerDeliveryLongitude"];
 
-    return Container(
+
+
+    Provider.of<LocationProvider>(context).calculateFinalPrice(startLat, startLng, endLat, endLng);
+
+    return  Consumer<LocationProvider>(
+        builder: (context, locationProvider, child) {
+          finalPrice=locationProvider.finalPrice;
+       return   Container(
       padding: const EdgeInsets.all(10),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Container(
-            margin:
-                const EdgeInsets.only(left: 0, right: 0, top: 10, bottom: 0),
-            child: Text(
-              'Upto 2 km - Rs. 30, above 2km - Rs. 10/km',
-              textAlign: TextAlign.center,
-              style: getMediumStyle(color: Colors.black)
-                  .copyWith(fontSize: 12, height: 1.5),
+          Visibility(
+            visible: false,
+            child: Container(
+              margin:
+                  const EdgeInsets.only(left: 0, right: 0, top: 10, bottom: 0),
+              child: Text(
+                'Upto 2 km - Rs. 30, above 2km - Rs. 10/km',
+                textAlign: TextAlign.center,
+                style: getMediumStyle(color: Colors.black)
+                    .copyWith(fontSize: 12, height: 1.5),
+              ),
             ),
           ),
           Container(
             margin:
                 const EdgeInsets.only(left: 0, right: 0, top: 30, bottom: 0),
             child: Text(
-              'Based on your Delivery Address your Delivery charge will be \nRs. 30',
+              'Based on your Delivery Address',
+              textAlign: TextAlign.center,
+              style: getHeadingStyle(color: Colors.black)
+                  .copyWith(fontSize: 17, height: 1.5),
+            ),
+          ),
+          Container(
+            margin:
+                const EdgeInsets.only(left: 0, right: 0, top: 0, bottom: 0),
+            child: Text(
+              'Your Delivery charge is \nRs. ${locationProvider.finalPrice}',
               textAlign: TextAlign.center,
               style: getHeadingStyle(color: Colors.black)
                   .copyWith(fontSize: 20, height: 1.5),
@@ -99,12 +142,21 @@ class _MakeAnOrderDialogState extends State<MakeAnOrderDialog> {
           )
         ],
       ),
+    );}
     );
   }
+
+
 
   late String orderID = '';
 
   confirmOrder(BuildContext context) {
+
+    if(finalPrice<1){
+      showCustomSnackBar('Please wait for the delivery charge', context,isToaster: true);
+      return;
+    }
+
     String? newKey = submitData.push().key;
 
     DateTime date = DateTime.now();
@@ -117,15 +169,15 @@ class _MakeAnOrderDialogState extends State<MakeAnOrderDialog> {
     bool isImgSelected = map['isImgSelected'];
 
     Map mapDeliveryAddress = {
-      'customerDeliveryLatitude': latitudeCurrent,
-      'customerDeliveryLongitude': longitudeCurrent,
-      'customerDeliveryFullAddress': fullAddress,
-      'customerDeliveryPinCode': pincode,
+
       'orderType': orderTypeRes,
       'orderID': orderID,
       'orderCreatedDate': formattedDate,
       'orderStatus': '1',
+      'deliveryCharge':finalPrice.toString()
+
     };
+
 
     map.addAll(mapDeliveryAddress);
 
@@ -135,6 +187,8 @@ class _MakeAnOrderDialogState extends State<MakeAnOrderDialog> {
       createDownloadURL(itemsListImage, newKey!);
     } else {
       map.remove('itemsListImage');
+
+      print(map.toString());
       createOrder(newKey!);
     }
   }
@@ -179,6 +233,7 @@ class _MakeAnOrderDialogState extends State<MakeAnOrderDialog> {
           MaterialPageRoute(
               builder: (_) => OrderSuccessScreen(
                     orderID: orderID,
+                map: map,
                   )));
     }).catchError((error) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -188,4 +243,7 @@ class _MakeAnOrderDialogState extends State<MakeAnOrderDialog> {
       Navigator.of(context).pop();
     });
   }
+
+
+
 }

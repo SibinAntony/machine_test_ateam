@@ -8,6 +8,7 @@ class VendorsModel {
   String categoryKey;
   String categoryName;
   String distance;
+  String mobileNumber;
 
 
   VendorsModel(
@@ -19,6 +20,7 @@ class VendorsModel {
       this.categoryKey,
       this.categoryName,
       this.distance,
+      this.mobileNumber,
       );
 
   @override

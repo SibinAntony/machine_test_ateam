@@ -5,15 +5,21 @@ import 'dart:math';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:carousel_slider/carousel_controller.dart';
 import 'package:carousel_slider/carousel_slider.dart';
+import 'package:door_step_customer/constants/push_notification_service.dart';
 import 'package:door_step_customer/models/BannerModel.dart';
 import 'package:door_step_customer/models/VendorsModel.dart';
+import 'package:door_step_customer/providers/location_provider.dart';
+import 'package:door_step_customer/screens/bestServices/BestServicePage.dart';
 import 'package:door_step_customer/screens/home/widget/CategoryItem.dart';
 import 'package:door_step_customer/screens/home/widget/VendorItem.dart';
 import 'package:door_step_customer/screens/location/LocationFetch.dart';
 import 'package:door_step_customer/screens/orders/OrderListScreen.dart';
+import 'package:door_step_customer/screens/profile/ProfilePage.dart';
 import 'package:door_step_customer/screens/vendorlist/VendorList.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -60,59 +66,10 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver  {
   late String userLocation = "";
   late double latitudeCurrent = 0.0;
   late double longitudeCurrent = 0.0;
-  // late bool notProvidingService = false;
 
   int _current = 0;
   final CarouselController _controller = CarouselController();
 
-  Position? _currentPosition;
-
-
-
-  Future<void> _getCurrentPosition() async {
-    final hasPermission = await _handleLocationPermission();
-
-    if (!hasPermission) return;
-    await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high)
-        .then((Position position) {
-      setState(() => _currentPosition = position);
-
-      // getMandiList(isRefresh: true, apiKey: apiKey);
-    }).catchError((e) {
-      debugPrint(e);
-    });
-  }
-
-  Future<bool> _handleLocationPermission() async {
-    bool serviceEnabled;
-    LocationPermission permission;
-
-    serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text(
-              'isLocationServiceEnabled : listOfScreenData.createTicketLocationFetchError!')));
-      return false;
-    }
-    permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text(
-                'denied : listOfScreenData.createTicketLocationFetchError!')));
-        return false;
-      }
-    }
-    if (permission == LocationPermission.deniedForever) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text(
-              'deniedForever :listOfScreenData.createTicketLocationFetchError!')));
-
-      return false;
-    }
-    return true;
-  }
 
   double _calculateDistance(
       double lat1, double lon1, double lat2, double lon2) {
@@ -137,7 +94,11 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver  {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     fetchUserData();
-    _getCurrentPosition();
+    fetUserLocationData();
+    updateToken();
+
+
+
   }
 
   @override
@@ -156,18 +117,16 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver  {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
-    print('state -> ${state.name}');
-
     if (state == AppLifecycleState.resumed) {
-      // The app has resumed from the background
-      print('App resumed');
       fetchUserData();
-      // Add your onResume code here
-    }else if(state==AppLifecycleState.paused){
-      print('App paused');
     }
   }
 
+  final streamUsers = FirebaseDatabase.instance
+      .ref('deliverymen')
+      .orderByChild('userType')
+      .equalTo('3')
+      .onValue;
 
   @override
   Widget build(BuildContext context) {
@@ -181,8 +140,6 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver  {
               // Color(0xFFEDFF7E),
               Colors.white,
             ],
-            // begin: Alignment.topCenter,
-            // end: Alignment.bottomCenter,
             begin: FractionalOffset(1.8, 0.0),
             end: FractionalOffset(0.0, 0.8),
             stops: [0.0, 1.0],
@@ -216,7 +173,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver  {
                                       Navigator.push(
                                           context,
                                           MaterialPageRoute(
-                                              builder: (_) =>  SelectLocationScreen(isFromAuth: false,
+                                              builder: (_) =>  SelectLocationScreen(isDeliveryAddress: false,isFromAuthDeliveryAddress: false,
                                                   )));
                                     },
                                     child: Container(
@@ -240,12 +197,14 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver  {
                               ),
                               InkWell(
                                 onTap: () {
-                                  Navigator.of(context).push(
+//                                   PushNotificationService.sendNotificationToSelectedDriver(
+// 'fAna4pa5RDWgXiiu3a-kXR:APA91bEuQcQLFLbax3Luoo0nE-78HCcXEF9K7m9utBP8qYfNBd58EH7EKvOyLSyzpBBb9Id7J13zaQuUGJdv2Mzd-tsT_3FV5TMV39QNP-nrC1D5cW6knr_7ppc1lfv_Hzg0-KCHrCvv'    ,                                  context,"widget.orderID",
+//                                       'New Order received','New order from');
+                                  Navigator.push(
+                                      context,
                                       MaterialPageRoute(
-                                          builder: (BuildContext context) =>
-                                              OrderListScreen(
-                                                userPref: mobileNumber,
-                                              )));
+                                          builder: (_) =>  const ProfilePage(
+                                          )));
                                 },
                                 child: Stack(
                                   children: [
@@ -295,13 +254,26 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver  {
                             mainAxisAlignment:
                                 MainAxisAlignment.spaceBetween,
                             children: [
-                              Container(
-                                width:
-                                    MediaQuery.of(context).size.width / 2,
+                              InkWell(
+                                onTap: (){
+                                  // PushNotificationService.sendNotificationToSelectedDriver(
+                                  //     'APA91bGlabhsmuTrT1r3DTV92EX_0V_yf4xgt5DtXaR2xrBlyItTAIaW1X0F3chK4Xwy5wy_fxWRFE4xkbJIMRGAGsdGw9un3AcRkSh_AlCS6DiHT_AhzYszja8SIG4TaSeMgunO74Hp',
+                                  //     context,"widget.orderID",
+                                  //     'New Order received','New order from');
+                                  Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                          builder: (_) =>  const ProfilePage(
+                                          )));
+                                },
+                                child: Container(
+                                  width:
+                                      MediaQuery.of(context).size.width / 2,
 
-                                child: Image.asset(
-                                  Images.top_images1,
-                                  fit: BoxFit.contain,
+                                  child: Image.asset(
+                                    Images.top_images1,
+                                    fit: BoxFit.contain,
+                                  ),
                                 ),
                               ),
                               Column(
@@ -636,17 +608,13 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver  {
                                                   (context, index) =>
                                                       InkWell(
                                                 onTap: () {
-                                                  // Navigator.push(
-                                                  //     context,
-                                                  //     MaterialPageRoute(
-                                                  //         builder: (_) =>
-                                                  //             VendorListPage(
-                                                  //               categoryModel:
-                                                  //                   service[
-                                                  //                       index],
-                                                  //               index:
-                                                  //                   index,
-                                                  //             )));
+                                                  Navigator.push(
+                                                      context,
+                                                      MaterialPageRoute(
+                                                          builder: (_) =>
+                                                              BestServicePage(
+                                                                categoryModel: service[index],
+                                                              )));
                                                 },
                                                 child: ServiceItem(
                                                   info: service[index],
@@ -740,6 +708,10 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver  {
                                       snapshot.data!.snapshot.value as Map?;
                                   vendorList.clear();
 
+                                  if(kDebugMode){
+                                    print('saved latlng $latitudeCurrent $longitudeCurrent');
+                                  }
+
                                   map!.forEach((key, value) {
                                     double itemLatitude = double.parse(
                                         value['vendorLatitude']);
@@ -759,7 +731,8 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver  {
                                           value['vendorLongitude'],
                                           value['categoryKey'],
                                           value['categoryName'],
-                                          distance.toString()));
+                                          distance.toString(),
+                                      value['mobileNumber']??''));
                                     }
                                   });
 
@@ -846,7 +819,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver  {
                                       Navigator.push(
                                           context,
                                           MaterialPageRoute(
-                                              builder: (_) =>  SelectLocationScreen(isFromAuth: false,
+                                              builder: (_) =>  SelectLocationScreen(isDeliveryAddress: false,isFromAuthDeliveryAddress: false
                                               )));
                                     },
                                     child: Container(
@@ -870,12 +843,12 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver  {
                               ),
                               InkWell(
                                 onTap: () {
-                                  Navigator.of(context).push(
+
+                                  Navigator.push(
+                                      context,
                                       MaterialPageRoute(
-                                          builder: (BuildContext context) =>
-                                              OrderListScreen(
-                                                userPref: mobileNumber,
-                                              )));
+                                          builder: (_) =>  const ProfilePage(
+                                          )));
                                 },
                                 child: Stack(
                                   children: [
@@ -925,13 +898,17 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver  {
                             mainAxisAlignment:
                             MainAxisAlignment.spaceBetween,
                             children: [
-                              Container(
-                                width:
-                                MediaQuery.of(context).size.width / 2,
+                              InkWell(
+                                onTap: (){
 
-                                child: Image.asset(
-                                  Images.top_images1,
-                                  fit: BoxFit.contain,
+                                },
+                                child: Container(
+                                  width:
+                                  MediaQuery.of(context).size.width / 2,
+                                  child: Image.asset(
+                                    Images.top_images1,
+                                    fit: BoxFit.contain,
+                                  ),
                                 ),
                               ),
                               Column(
@@ -1002,6 +979,8 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver  {
     );
   }
 
+  DatabaseReference usersRef = FirebaseDatabase.instance.ref('users');
+
   Future<void> fetchUserData() async {
     sharedPreferences = await SharedPreferences.getInstance();
     String? userPref = sharedPreferences.getString('userData');
@@ -1017,5 +996,52 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver  {
     longitudeCurrent = userLocationMap['currentLongitude'];
     List<String> parts = name.split(" ");
     userName = parts[0];
+  }
+
+  fetUserLocationData() async {
+    sharedPreferences = await SharedPreferences.getInstance();
+    String? userLocationPref = sharedPreferences.getString('userLocation');
+    Map<String, dynamic> userLocationMap = jsonDecode(userLocationPref!) as Map<String, dynamic>;
+    latitudeCurrent =userLocationMap['currentLatitude'] ;
+    longitudeCurrent = userLocationMap['currentLongitude'];
+
+    double itemLatitude = 10.2787199;
+    double itemLongitude = 78.5402285;
+
+    double distance = _calculateDistance(
+        latitudeCurrent,
+        longitudeCurrent,
+        itemLatitude,
+        itemLongitude);
+    bool status=distance <= maxDistanceInKm?true:false;
+
+    if(kDebugMode){
+      print('distance status $status');
+      print('distance $distance $maxDistanceInKm');
+    }
+
+    Provider.of<HomeProviders>(context,listen: false).setNotProvidingService(status);
+
+  }
+
+  Future<void> updateToken() async {
+
+    String? token = await FirebaseMessaging.instance.getToken();
+    Map<String, dynamic> newData = {
+      'deviceToken': token,
+    };
+
+    sharedPreferences.setString('deviceToken', token!);
+
+    usersRef.child(customerId).update(newData).then((value) {
+      if(kDebugMode) {
+        print('Key Updated');
+      }
+    }).catchError((error) {
+      if(kDebugMode) {
+        print('Something failed :$error');
+      }
+    });
+
   }
 }

@@ -3,23 +3,30 @@ import 'dart:convert';
 import 'package:door_step_customer/constants/color.dart';
 import 'package:door_step_customer/constants/show_custom_snakbar.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:google_places_flutter/google_places_flutter.dart';
 import 'package:map_location_picker/map_location_picker.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../widgets/animated_custom_dialog.dart';
 import '../home/HomePage.dart';
 import '../../providers/location_provider.dart';
+import '../orders/MakeAnOrderDialog.dart';
 import 'location_search_dialog.dart';
 
-class SelectLocationScreen extends StatefulWidget  {
+class SelectLocationScreen extends StatefulWidget {
+  bool isDeliveryAddress = false;
+  bool isFromAuthDeliveryAddress = false;
+  Map? map;
 
-  bool isFromAuth=false;
-
-    SelectLocationScreen({Key? key, required this.isFromAuth}) : super(key: key);
+  SelectLocationScreen({Key? key, required this.isDeliveryAddress, this.map,required this.isFromAuthDeliveryAddress})
+      : super(key: key);
 
   @override
   SelectLocationScreenState createState() => SelectLocationScreenState();
@@ -27,23 +34,20 @@ class SelectLocationScreen extends StatefulWidget  {
 
 class SelectLocationScreenState extends State<SelectLocationScreen> {
   GoogleMapController? _controller;
+
   // final TextEditingController _locationController = TextEditingController();
   CameraPosition? _cameraPosition;
   TextEditingController searchController = TextEditingController();
 
   final DatabaseReference submitData =
-  FirebaseDatabase.instance.reference().child('users');
+      FirebaseDatabase.instance.reference().child('users');
 
   @override
   void initState() {
     super.initState();
-    // Provider.of<LocationProvider>(context).getCurrentLocation( false);
-    // Provider.of<LocationProvider>(context, listen: false).setPickData();
-    // _openSearchDialog(context,_controller);
-    //
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      // Provider.of<LocationProvider>(context).getCurrentLocation();
-      // showDialog(context: context, builder: (context) => const LocationSearchDialog());
+
     });
   }
 
@@ -60,15 +64,22 @@ class SelectLocationScreenState extends State<SelectLocationScreen> {
     _controller!.dispose();
   }
 
-  void _openSearchDialog(BuildContext context, GoogleMapController? mapController) async {
-    showDialog(context: context, builder: (context) => const LocationSearchDialog());
-  }
+  Position? _currentPosition;
+
+
+
+
 
   @override
   Widget build(BuildContext context) {
-    searchController.text = Provider.of<LocationProvider>(context).address.name==null ?'':'${Provider.of<LocationProvider>(context).address.name ?? ''}, '
-        '${Provider.of<LocationProvider>(context).address.subAdministrativeArea ?? ''}, '
-        '${Provider.of<LocationProvider>(context).address.isoCountryCode ?? ''}';
+    searchController.text = Provider.of<LocationProvider>(context)
+                .address
+                .name ==
+            null
+        ? ''
+        : '${Provider.of<LocationProvider>(context).address.name ?? ''}, '
+            '${Provider.of<LocationProvider>(context).address.subAdministrativeArea ?? ''}, '
+            '${Provider.of<LocationProvider>(context).address.isoCountryCode ?? ''}';
 
     return Scaffold(
       body: SafeArea(
@@ -84,7 +95,8 @@ class SelectLocationScreenState extends State<SelectLocationScreen> {
                       GoogleMap(
                         mapType: MapType.normal,
                         initialCameraPosition: CameraPosition(
-                          target: LatLng(locationProvider.position.latitude, locationProvider.position.longitude),
+                          target: LatLng(locationProvider.position.latitude,
+                              locationProvider.position.longitude),
                           zoom: 15,
                         ),
                         zoomControlsEnabled: false,
@@ -92,69 +104,84 @@ class SelectLocationScreenState extends State<SelectLocationScreen> {
                         indoorViewEnabled: true,
                         mapToolbarEnabled: true,
                         onCameraIdle: () {
-                          locationProvider.updatePosition(position: _cameraPosition, null, context);
+                          locationProvider.updatePosition(
+                              position: _cameraPosition, null, context);
                         },
-                        onCameraMove: ((position) => _cameraPosition = position),
-                        // markers: Set<Marker>.of(locationProvider.markers),
+                        onCameraMove: ((position) =>
+                            _cameraPosition = position),
                         onMapCreated: (GoogleMapController controller) {
                           _controller = controller;
+                          if (widget.isDeliveryAddress) {
+                            setDeliveryLocation(locationProvider);
+                          }else{
+                            if(widget.isFromAuthDeliveryAddress) {
+                              locationProvider.checkLocationPermission(
+                                  _controller!, context);
+                            }else{
+                              // locationProvider.se
+                            bindExistingLocation(locationProvider);
+                            }
+                          }
                         },
                       ),
                       locationProvider.pickAddress != null
                           ? InkWell(
-                        child: Container(
-                          width: MediaQuery.of(context).size.width,
-                          height: 60,
-                          margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 23.0),
-                          decoration:
-                          BoxDecoration(color: Theme.of(context).cardColor, borderRadius: BorderRadius.circular(10)),
-                         child: GooglePlaceAutoCompleteTextField(
-                            textEditingController: searchController,
-                            googleAPIKey: googleApiKey,
-                            inputDecoration: const InputDecoration(
-                              hintText: "Search your location",
-                              border: InputBorder.none,
-                              enabledBorder: InputBorder.none,
-                            ),
-                            countries: ["in"],
-                            getPlaceDetailWithLatLng: ( prediction) {
+                              child: Container(
+                                width: MediaQuery.of(context).size.width,
+                                height: 60,
+                                margin: const EdgeInsets.symmetric(
+                                    horizontal: 20, vertical: 23.0),
+                                decoration: BoxDecoration(
+                                    color: Theme.of(context).cardColor,
+                                    borderRadius: BorderRadius.circular(10)),
+                                child: GooglePlaceAutoCompleteTextField(
+                                  textEditingController: searchController,
+                                  googleAPIKey: googleApiKey,
+                                  inputDecoration: const InputDecoration(
+                                    hintText: "Search your location",
+                                    border: InputBorder.none,
+                                    enabledBorder: InputBorder.none,
+                                  ),
+                                  countries: ["in"],
 
+                                  getPlaceDetailWithLatLng: (prediction) {
+                                    double lat = double.parse(prediction.lat!);
+                                    double lng = double.parse(prediction.lng!);
 
-                              double lat=double.parse(prediction.lat!);
-                              double lng=double.parse(prediction.lng!);
-
-                              locationProvider.setLocation(_controller,lat,lng);
-
-
-                            },
-                            itemClick: ( prediction) {
-                              searchController.text = prediction.description ?? "";
-                              searchController.selection = TextSelection.fromPosition(
-                                  TextPosition(offset: prediction.description?.length ?? 0));
-
-
-                            },
-                            seperatedBuilder: const Divider(),
-                            containerHorizontalPadding: 10,
-                            itemBuilder: (context, index,  prediction) {
-                              return Container(
-                                padding: const EdgeInsets.all(10),
-                                child: Row(
-                                  children: [
-                                    const Icon(Icons.location_on),
-                                    const SizedBox(
-                                      width: 7,
-                                    ),
-                                    Expanded(child: Text("${prediction.description ?? ""}"))
-                                  ],
+                                    locationProvider.setLocation(
+                                        _controller, lat, lng);
+                                  },
+                                  itemClick: (prediction) {
+                                    searchController.text =
+                                        prediction.description ?? "";
+                                    searchController.selection =
+                                        TextSelection.fromPosition(TextPosition(
+                                            offset: prediction
+                                                    .description?.length ??
+                                                0));
+                                  },
+                                  seperatedBuilder: const Divider(),
+                                  containerHorizontalPadding: 10,
+                                  itemBuilder: (context, index, prediction) {
+                                    return Container(
+                                      padding: const EdgeInsets.all(10),
+                                      child: Row(
+                                        children: [
+                                          const Icon(Icons.location_on),
+                                          const SizedBox(
+                                            width: 7,
+                                          ),
+                                          Expanded(
+                                              child: Text(
+                                                  "${prediction.description ?? ""}"))
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                  isCrossBtnShown: true,
                                 ),
-                              );
-                            },
-
-                            isCrossBtnShown: true,
-                          ),
-                        ),
-                      )
+                              ),
+                            )
                           : const SizedBox.shrink(),
                       Positioned(
                         bottom: 0,
@@ -165,7 +192,9 @@ class SelectLocationScreenState extends State<SelectLocationScreen> {
                           children: [
                             InkWell(
                               onTap: () {
-                                locationProvider.getCurrentLocation(  mapController: _controller);
+
+                                locationProvider.getCurrentLocation(
+                                     _controller,context);
 
                                 // locationProvider.setLocation(_controller,11.9415915,79.8083133);
                               },
@@ -184,9 +213,38 @@ class SelectLocationScreenState extends State<SelectLocationScreen> {
                                 ),
                               ),
                             ),
-
                             Column(
                               children: [
+                                Visibility(
+                                    visible: locationProvider.lng != 0.0,
+                                    child: Container(
+                                      width: MediaQuery.of(context).size.width,
+                                      decoration: const BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius: BorderRadius.all(
+                                          Radius.circular(10),
+                                        ),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.grey,
+                                            // spreadRadius: 1,
+                                            blurRadius: 7,
+                                            offset: Offset(0,
+                                                3), // changes position of shadow
+                                          ),
+                                        ],
+                                      ),
+                                      margin: const EdgeInsets.only(
+                                          left: 20, right: 20),
+                                      padding: const EdgeInsets.only(
+                                          left: 15,
+                                          top: 10,
+                                          bottom: 10,
+                                          right: 15),
+                                      alignment: Alignment.center,
+                                      child: Text(
+                                          '${locationProvider.address.name}'),
+                                    )),
                                 Container(
                                   height: 55,
                                   width: MediaQuery.of(context).size.width,
@@ -195,17 +253,33 @@ class SelectLocationScreenState extends State<SelectLocationScreen> {
                                   child: TextButton(
                                       style: ButtonStyle(
                                           foregroundColor:
-                                          MaterialStateProperty.all<Color>(Colors.white),
+                                              MaterialStateProperty.all<Color>(
+                                                  Colors.white),
                                           backgroundColor:
-                                          MaterialStateProperty.all<Color>(primaryColor),
+                                              MaterialStateProperty.all<Color>(
+                                                  primaryColor),
                                           shape: MaterialStateProperty.all<
-                                              RoundedRectangleBorder>(const RoundedRectangleBorder(
-                                            borderRadius:
-                                            BorderRadius.all(Radius.circular(15)),
+                                                  RoundedRectangleBorder>(
+                                              const RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.all(
+                                                Radius.circular(15)),
                                           ))),
                                       onPressed: () async => {
-                                        saveLocation()
-                                      },
+                                            if (Provider.of<LocationProvider>(
+                                                        context,
+                                                        listen: false)
+                                                    .lat !=
+                                                0.0)
+                                              {if(widget.isDeliveryAddress){
+                                                confirmDelivery()
+                                              }else{ saveLocation()}}
+                                            else
+                                              {
+                                                showCustomSnackBar(
+                                                    'Please choose your delivery location',
+                                                    context)
+                                              }
+                                          },
                                       child: const Text("Use this Location",
                                           style: TextStyle(fontSize: 14))),
                                 ),
@@ -216,12 +290,15 @@ class SelectLocationScreenState extends State<SelectLocationScreen> {
                       ),
                       Center(
                           child: Icon(
-                            Icons.location_on,
-                            color: Theme.of(context).primaryColor,
-                            size: 50,
-                          )),
+                        Icons.location_on,
+                        color: Theme.of(context).primaryColor,
+                        size: 50,
+                      )),
                       locationProvider.loading
-                          ? Center(child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Theme.of(context).primaryColor)))
+                          ? Center(
+                              child: CircularProgressIndicator(
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                      Theme.of(context).primaryColor)))
                           : const SizedBox(),
                     ],
                   ),
@@ -233,30 +310,32 @@ class SelectLocationScreenState extends State<SelectLocationScreen> {
       ),
     );
   }
-  late SharedPreferences sharedPref;
-  saveLocation() async {
 
+  late SharedPreferences sharedPref;
+
+  saveLocation() async {
     sharedPref = await SharedPreferences.getInstance();
     String? userPref = sharedPref.getString('userData');
     Map<String, dynamic> userMap =
-    jsonDecode(userPref!) as Map<String, dynamic>;
+        jsonDecode(userPref!) as Map<String, dynamic>;
 
     Map<String, dynamic> newData = {
-      'currentFullAddress':  searchController.text,
-      'currentLatitude':Provider.of<LocationProvider>(context, listen: false).lat,
-      'currentLongitude':  Provider.of<LocationProvider>(context, listen: false).lng,
-      'currentArea':  Provider.of<LocationProvider>(context, listen: false).address.locality.toString(),
+      'currentFullAddress': searchController.text,
+      'currentLatitude': Provider.of<LocationProvider>(context, listen: false).lat,
+      'currentLongitude': Provider.of<LocationProvider>(context, listen: false).lng,
+      'currentArea': Provider.of<LocationProvider>(context, listen: false)
+          .address
+          .locality
+          .toString(),
     };
     submitData.child(userMap['key']!).update(newData).then((value) {
       success(newData);
-
     }).catchError((error) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text('Something failed :$error'),
         duration: const Duration(seconds: 2),
       ));
     });
-
   }
 
   Future<void> success(Map<String, dynamic> user) async {
@@ -266,14 +345,85 @@ class SelectLocationScreenState extends State<SelectLocationScreen> {
     Navigator.of(context).pushReplacement(MaterialPageRoute(
         builder: (BuildContext context) => const MyHomePage()));
 
-    showCustomSnackBar('Address Updated', context,isError: false);
+    showCustomSnackBar('Address Updated', context, isError: false);
+  }
 
-    // if(widget.isFromAuth){
-    //
-    // }else {
-    //
-    //   Navigator.pop(context);
-    // }
+  late SharedPreferences sharedPreferences;
+
+  Future<void> setDeliveryLocation(LocationProvider locationProvider) async {
+    sharedPreferences = await SharedPreferences.getInstance();
+    String? userLocationPref = sharedPreferences.getString('userLocation');
+    Map<String, dynamic> userLocationMap =
+        jsonDecode(userLocationPref!) as Map<String, dynamic>;
+    double lat = userLocationMap['currentLatitude'];
+    double lng = userLocationMap['currentLongitude'];
+
+    locationProvider.setLocation(_controller, lat, lng);
+  }
+
+  confirmDelivery() {
+
+    double lat= Provider.of<LocationProvider>(context, listen: false).lat;
+    double lng= Provider.of<LocationProvider>(context, listen: false).lng;
+
+    // Map<dynamic, dynamic> map = {"deliveryAddress":searchController.text,"deliveryLat":lat,"deliveryLng":lng};
+
+    widget.map?.addAll({"customerDeliveryFullAddress":searchController.text,"customerDeliveryLatitude":lat,"customerDeliveryLongitude":lng});
+
+    if(kDebugMode) {
+      print("Order Details/n");
+      print(widget.map.toString());
+    }
+    showAnimatedDialog(
+        context,
+        MakeAnOrderDialog(
+          map: widget.map,
+        ),
+        dismissible: true,
+        isFlip: false);
+
 
   }
+
+
+  showAlertDialog(BuildContext context) {
+    // set up the button
+    Widget okButton = TextButton(
+      child: const Text("OK"),
+      onPressed: () {
+        Navigator.of(context).pop();
+      },
+    );
+    // set up the AlertDialog
+    AlertDialog alert = AlertDialog(
+      // title: Text("My title"),
+      title: const Text("Please enable your location",style: TextStyle(fontSize: 18),),
+      actions: [
+        okButton,
+      ],
+    );
+
+    // show the dialog
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return alert;
+      },
+    );
+  }
+
+  Future<void> bindExistingLocation(LocationProvider locationProvider) async {
+    sharedPreferences = await SharedPreferences.getInstance();
+    String? userLocationPref = sharedPreferences.getString('userLocation');
+    Map<String, dynamic> userLocationMap = jsonDecode(userLocationPref!) as Map<String, dynamic>;
+    latitudeCurrent =userLocationMap['currentLatitude'] ;
+    longitudeCurrent = userLocationMap['currentLongitude'];
+
+    double itemLatitude = latitudeCurrent;
+    double itemLongitude = longitudeCurrent;
+
+    locationProvider.setLocation(_controller, itemLatitude, itemLongitude);
+  }
+
+
 }

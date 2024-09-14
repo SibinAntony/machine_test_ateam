@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
@@ -5,6 +7,11 @@ import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:map_location_picker/map_location_picker.dart';
+import 'package:path/path.dart';
+import 'package:permission_handler/permission_handler.dart';
+
+import '../constants/Constants.dart';
+import 'package:http/http.dart' as http;
 
 class LocationProvider with ChangeNotifier {
   // final SharedPreferences? sharedPreferences;
@@ -58,8 +65,98 @@ class LocationProvider with ChangeNotifier {
 
   double get lng => _lng;
 
+
+
+  Future<void> checkLocationPermission(GoogleMapController controller,BuildContext context) async {
+    PermissionStatus status = await Permission.location.status;
+
+    if (status.isDenied) {
+      // Permission is denied, request permission
+      PermissionStatus result = await Permission.location.request();
+      if (result.isGranted) {
+        // Permission is granted, do something
+        print('Location permission granted');
+        // _getCurrentPosition();
+        _handleLocationPermission(controller,context);
+        // return true;
+      } else if (result.isDenied) {
+        // Permission is denied again
+        print('Location permission denied');
+        // return false;
+      } else if (result.isPermanentlyDenied) {
+        // Permission is permanently denied, open app settings
+        openAppSettings();
+        // return false;
+      }
+    } else if (status.isGranted) {
+      // Permission is already granted
+      print('Location permission already granted');
+      _handleLocationPermission(controller,context);
+      // return false;
+    }
+  }
+
+  Future<void> _handleLocationPermission(GoogleMapController controller,BuildContext context) async {
+
+    bool serviceEnabled;
+    LocationPermission permission;
+
+    serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      _getCurrentPosition(controller);
+      // showAlertDialog(context);
+      return;
+    }
+    permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        openAppSettings();
+        return;
+      }
+    }
+    if (permission == LocationPermission.deniedForever) {
+      openAppSettings();
+      return;
+    }
+
+    _getCurrentPosition(controller);
+  }
+
+
+  Future<void> _getCurrentPosition(GoogleMapController mapController) async {
+    if(kDebugMode) {
+      print('update location start');
+    }
+   await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high)
+        .then((Position position) {
+      // setState(() {
+      // _currentPosition = position;
+      // });
+
+     double lat=position.latitude;
+     double lng=position.longitude;
+
+      setLocation(mapController, lat, lng);
+      if(kDebugMode) {
+        print('update location setState');
+      }
+      // if(kDebugMode) {
+      //   print('update location ${_currentPosition!.latitude}');
+      //   print('update location ${_currentPosition!.toString()}');
+      // }
+
+    }).catchError((e) {
+      debugPrint('Error found ${e.toString()}');
+    });
+  }
+
+
+
+
+
   // for get current location
-  void getCurrentLocation({GoogleMapController? mapController}) async {
+  void getCurrentLocation(GoogleMapController? mapController,BuildContext _context) async {
     _loading = true;
     notifyListeners();
     Position myPosition;
@@ -68,58 +165,90 @@ class LocationProvider with ChangeNotifier {
           desiredAccuracy: LocationAccuracy.high);
       myPosition = newLocalData;
 
+
+      _position = myPosition;
+      if (mapController != null) {
+        mapController.animateCamera(CameraUpdate.newCameraPosition(
+          CameraPosition(
+              target: LatLng(myPosition.latitude, myPosition.longitude),
+              zoom: 17),
+        ));
+      }
+      Placemark myPlaceMark;
+      try {
+        List<Placemark> placemarks = await placemarkFromCoordinates(
+            myPosition.latitude, myPosition.longitude);
+        Placemark place = placemarks[0];
+        String address =
+            '${place.street}, ${place.subLocality}, ${place.locality}, ${place.administrativeArea} - ${place.postalCode}';
+        myPlaceMark =
+            Placemark(name: address, locality: place.locality, administrativeArea: place.administrativeArea, postalCode: '', country: '');
+
+        _lat=myPosition.latitude;
+        _lng=myPosition.longitude;
+        _address = myPlaceMark;
+      } catch (e) {
+        List<Placemark> placemarks = await placemarkFromCoordinates(
+            myPosition.latitude, myPosition.longitude);
+        Placemark place = placemarks[0];
+        String address =
+            '${place.street}, ${place.subLocality}, ${place.locality}, ${place.administrativeArea} - ${place.postalCode}';
+        myPlaceMark =
+            Placemark(name: address, locality: place.locality, administrativeArea: place.administrativeArea, postalCode: '', country: '');
+        _lat=myPosition.latitude;
+        _lng=myPosition.longitude;
+        _address = myPlaceMark;
+      }
+
+      _locationController.text = placeMarkToAddress(_address);
+      _loading = false;
+      notifyListeners();
+
       // position.
     } catch (e) {
-      myPosition = Position(
-        altitudeAccuracy: 1,
-        headingAccuracy: 1,
-        latitude: double.parse('0'),
-        longitude: double.parse('0'),
-        timestamp: DateTime.now(),
-        accuracy: 1,
-        altitude: 1,
-        heading: 1,
-        speed: 1,
-        speedAccuracy: 1,
-      );
-    }
-    _position = myPosition;
-    if (mapController != null) {
-      mapController.animateCamera(CameraUpdate.newCameraPosition(
-        CameraPosition(
-            target: LatLng(myPosition.latitude, myPosition.longitude),
-            zoom: 17),
-      ));
-    }
-    Placemark myPlaceMark;
-    try {
-      List<Placemark> placemarks = await placemarkFromCoordinates(
-          myPosition.latitude, myPosition.longitude);
-      Placemark place = placemarks[0];
-      String address =
-          '${place.street}, ${place.subLocality}, ${place.locality}, ${place.administrativeArea} - ${place.postalCode}';
-      myPlaceMark =
-          Placemark(name: address, locality: place.locality, administrativeArea: place.administrativeArea, postalCode: '', country: '');
-
-      _lat=myPosition.latitude;
-      _lng=myPosition.longitude;
-      _address = myPlaceMark;
-    } catch (e) {
-      List<Placemark> placemarks = await placemarkFromCoordinates(
-          myPosition.latitude, myPosition.longitude);
-      Placemark place = placemarks[0];
-      String address =
-          '${place.street}, ${place.subLocality}, ${place.locality}, ${place.administrativeArea} - ${place.postalCode}';
-      myPlaceMark =
-          Placemark(name: address, locality: place.locality, administrativeArea: place.administrativeArea, postalCode: '', country: '');
-      _lat=myPosition.latitude;
-      _lng=myPosition.longitude;
-      _address = myPlaceMark;
+      // myPosition = Position(
+      //   altitudeAccuracy: 1,
+      //   headingAccuracy: 1,
+      //   latitude: double.parse('0'),
+      //   longitude: double.parse('0'),
+      //   timestamp: DateTime.now(),
+      //   accuracy: 1,
+      //   altitude: 1,
+      //   heading: 1,
+      //   speed: 1,
+      //   speedAccuracy: 1,
+      // );
+      _loading = false;
+      notifyListeners();
+      showAlertDialog(_context);
     }
 
-    _locationController.text = placeMarkToAddress(_address);
-    _loading = false;
-    notifyListeners();
+  }
+
+  showAlertDialog(BuildContext context) {
+    // set up the button
+    Widget okButton = TextButton(
+      child: const Text("OK"),
+      onPressed: () {
+        Navigator.of(context).pop();
+      },
+    );
+    // set up the AlertDialog
+    AlertDialog alert = AlertDialog(
+      // title: Text("My title"),
+      title: const Text("Please enable your location",style: TextStyle(fontSize: 18),),
+      actions: [
+        okButton,
+      ],
+    );
+
+    // show the dialog
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return alert;
+      },
+    );
   }
 
   void updatePosition(String? address, BuildContext context,
@@ -211,6 +340,7 @@ class LocationProvider with ChangeNotifier {
 
   void setLocation(
       GoogleMapController? mapController, double lat, double lng) async {
+    _loading = true;
     if (mapController != null) {
       mapController.animateCamera(CameraUpdate.newCameraPosition(
         CameraPosition(target: LatLng(lat, lng), zoom: 17),
@@ -248,5 +378,62 @@ class LocationProvider with ChangeNotifier {
     return '${placeMark.name ?? ''}'
         ' ${placeMark.subAdministrativeArea ?? ''}'
         ' ${placeMark.isoCountryCode ?? ''}';
+  }
+
+
+  double _finalPrice=0.0;
+  double get finalPrice=>_finalPrice;
+
+  Future<void> calculateFinalPrice(double startLat, double startLng, double endLat, double endLng) async {
+
+    try {
+      double distance = await getRoadDistance(startLat, startLng, endLat, endLng);
+
+      double amount=20.0;
+      if(distance<=2){
+        amount=20.0;
+        print('Rs $amount');
+      }else{
+        distance=distance-2;
+        amount=amount*distance;
+        print('Rs $amount');
+      }
+      print('Distance: $distance km');
+      _finalPrice=amount;
+      notifyListeners();
+      // return distance;
+    } catch (e) {
+      print(e);
+     // return 0.0;
+
+    }
+  }
+
+
+  Future<double> getRoadDistance(double startLat, double startLng, double endLat, double endLng) async {
+    // final apiKey = 'YOUR_GOOGLE_MAPS_API_KEY';
+
+    // Directions API endpoint
+    final url = Uri.parse(
+        'https://maps.googleapis.com/maps/api/directions/json?origin=$startLat,$startLng&destination=$endLat,$endLng&key=$googleApiKey');
+
+    // Send the request
+    final response = await http.get(url);
+
+    if (response.statusCode == 200) {
+      // Parse the response
+      final data = json.decode(response.body);
+
+      if (data['routes'].isNotEmpty) {
+        // Distance is in meters
+        final distanceMeters = data['routes'][0]['legs'][0]['distance']['value'];
+        final distanceKilometers = distanceMeters / 1000;
+        return distanceKilometers;
+      } else {
+        throw Exception('No route found');
+      }
+    } else {
+      throw Exception('Failed to load directions');
+    }
   }
 }

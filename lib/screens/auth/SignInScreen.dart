@@ -1,22 +1,14 @@
-import 'dart:math';
 
 import 'package:door_step_customer/constants/color.dart';
-import 'package:door_step_customer/resources/styles_manager.dart';
 import 'package:door_step_customer/screens/auth/OTPVerification.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_database/firebase_database.dart';
-import 'package:firebase_pagination/firebase_pagination.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:provider/provider.dart';
 
 import '../../constants/Images.dart';
 import '../../constants/show_custom_snakbar.dart';
-import '../../models/CategoryModel.dart';
-import '../../models/VendorsModel.dart';
-import '../../providers/VendorProviders.dart';
-import '../home/widget/VendorItem.dart';
 
 class SignInScreen extends StatefulWidget {
   const SignInScreen({super.key});
@@ -40,6 +32,7 @@ class _SignInScreenState extends State<SignInScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
         body: Container(
+          height: MediaQuery.of(context).size.height,
       color: Colors.white,
       child: SingleChildScrollView(
         child: Column(
@@ -180,7 +173,13 @@ class _SignInScreenState extends State<SignInScreen> {
         codeAutoRetrievalTimeout: (String verificationId) {},
       );
     } on FirebaseAuthException catch (e) {
-      showCustomSnackBar("${e.message}", context);
+      setState(() {
+        isLoading = false;
+      });
+      if(kDebugMode) {
+        print("Failure status ${e.message}");
+      }
+      showCustomSnackBar("${e.message}", context,isToaster: true);
     }
   }
 }

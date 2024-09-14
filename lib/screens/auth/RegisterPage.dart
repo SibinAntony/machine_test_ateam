@@ -251,7 +251,7 @@ class _RegisterPageState extends State<RegisterPage> {
         context,
         MaterialPageRoute(
             builder: (_) =>  SelectLocationScreen(
-              isFromAuth: true,
+              isDeliveryAddress: false,isFromAuthDeliveryAddress: true
             )));
 
   }
