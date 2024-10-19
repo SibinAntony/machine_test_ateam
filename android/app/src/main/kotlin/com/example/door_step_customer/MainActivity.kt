@@ -1,4 +1,4 @@
-package com.kotpro.door_step_customer
+package com.ateam.door_step_customer
 
 import io.flutter.embedding.android.FlutterActivity
 
